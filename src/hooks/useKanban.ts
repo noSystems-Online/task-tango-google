@@ -42,10 +42,15 @@ export function useKanban(initialColumns: Column[]) {
     // Find the column to get project_id
     const column = columns.find((col) => col.id === columnId);
     if (!column) throw new Error("Column not found");
-    // You may want to get user_id from auth, for now set as empty string
-    const user_id = "";
-    // If project_id is not on the column, you must pass it in or look it up elsewhere
-    // For now, fallback to empty string
+    // Get current user from Supabase auth
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+    if (userError || !user) {
+      throw new Error("No authenticated user found.");
+    }
+    const user_id = user.id;
     const project_id = column.project_id;
     const { data, error } = await supabase
       .from("tasks")
@@ -141,20 +146,10 @@ export function useKanban(initialColumns: Column[]) {
     const newStatus = columns.find((col) => col.id === toColumnId)?.status;
     if (!newStatus) return;
 
-    // Update task in Supabase
-    const { error } = await supabase
-      .from("tasks")
-      .update({
-        column_id: toColumnId,
-        status: newStatus,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", taskId);
-    if (error) {
-      throw error;
-    }
+    // Optimistically update UI first
+    // Save previous state for rollback
+    const prevColumns = columns;
 
-    // Remove task from source column and add to destination column
     setColumns((prev) =>
       prev.map((column) => {
         if (column.id === fromColumnId) {
@@ -179,6 +174,24 @@ export function useKanban(initialColumns: Column[]) {
         return column;
       })
     );
+
+    // Update task in Supabase (background)
+    const { error } = await supabase
+      .from("tasks")
+      .update({
+        column_id: toColumnId,
+        status: newStatus,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", taskId);
+    if (error) {
+      // Rollback UI state
+      setColumns(prevColumns);
+      // Optionally: show error to user (could use toast/snackbar)
+      // eslint-disable-next-line no-console
+      console.error("Failed to move task:", error.message || error);
+      throw error;
+    }
   };
 
   // Add reorderColumns for column drag-and-drop

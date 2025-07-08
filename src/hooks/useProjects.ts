@@ -114,7 +114,6 @@ export function useProjects() {
 
   useEffect(() => {
     fetchAll();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const deleteProject = async (projectId: string) => {
     // Delete project from Supabase (will cascade to columns/tasks if set up)

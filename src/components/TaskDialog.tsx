@@ -48,6 +48,7 @@ export function TaskDialog({
     control,
     handleSubmit,
     reset,
+    setValue,
     formState: { errors },
   } = useForm({
     resolver: zodResolver(taskSchema),
@@ -92,22 +93,6 @@ export function TaskDialog({
           })
       )
     ).then((previews) => setAttachmentPreviews(previews));
-  };
-
-  const onSubmit = (data: z.infer<typeof taskSchema>) => {
-    onSave({ ...task, ...data }, selectedFiles);
-    onClose();
-  };
-
-  const handleClose = () => {
-    reset({
-      title: task?.title || "",
-      description: task?.description || "",
-      attachments: [],
-    });
-    setAttachmentPreviews(task?.attachmentUrls || []);
-    setSelectedFiles([]);
-    onClose();
   };
 
   // --- Image Paste Handler for ReactQuill ---
@@ -165,6 +150,22 @@ export function TaskDialog({
     };
   }, [isOpen]);
 
+  const onSubmit = (data: z.infer<typeof taskSchema>) => {
+    onSave({ ...task, ...data }, selectedFiles);
+    onClose();
+  };
+
+  const handleClose = () => {
+    reset({
+      title: task?.title || "",
+      description: task?.description || "",
+      attachments: [],
+    });
+    setAttachmentPreviews(task?.attachmentUrls || []);
+    setSelectedFiles([]);
+    onClose();
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
       <DialogContent>
@@ -198,11 +199,38 @@ export function TaskDialog({
                   theme="snow"
                   value={field.value}
                   onChange={field.onChange}
+                  modules={{
+                    toolbar: [
+                      [{ header: [1, 2, 3, false] }],
+                      [
+                        "bold",
+                        "italic",
+                        "underline",
+                        "strike",
+                        "blockquote",
+                        "code-block",
+                      ],
+                      [
+                        { list: "ordered" },
+                        { list: "bullet" },
+                        { indent: "-1" },
+                        { indent: "+1" },
+                      ],
+                      ["link", "image", "video"],
+                      [{ color: [] }, { background: [] }],
+                      [{ align: [] }],
+                      ["clean"],
+                    ],
+                  }}
+                  placeholder="Write a description..."
                 />
               )}
             />
           </div>
-          <div className="grid gap-2">
+
+          <div className="w-full border-t border-border/30 my-2" />
+
+          <div className="grid gap-2 pt-2">
             <Label htmlFor="attachment">Attachments</Label>
             <Input
               id="attachment"

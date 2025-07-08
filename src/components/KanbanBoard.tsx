@@ -39,12 +39,14 @@ export function KanbanBoard({
   onColumnsChange,
   onProjectDeleted,
 }: KanbanBoardProps) {
-  const [columns, setColumns] = useState(project.columns);
-  useEffect(() => {
-    setColumns(project.columns);
-  }, [project.columns]);
-  const { createTask, updateTask, deleteTask, moveTask, reorderColumns } =
-    useKanban(columns);
+  const {
+    columns,
+    createTask,
+    updateTask,
+    deleteTask,
+    moveTask,
+    reorderColumns,
+  } = useKanban(project.columns);
   const [activeTask, setActiveTask] = useState<Task | null>(null);
   const [activeColumnId, setActiveColumnId] = useState<string | null>(null);
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
@@ -268,10 +270,7 @@ export function KanbanBoard({
         onSave={handleSaveProjectSettings}
         onDelete={handleDeleteProject}
         project={{ ...project, columns }}
-        onColumnsChange={(cols) => {
-          setColumns(cols);
-          if (typeof onColumnsChange === "function") onColumnsChange(cols);
-        }}
+        onColumnsChange={onColumnsChange}
       />
     </div>
   );
