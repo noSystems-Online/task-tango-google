@@ -13,12 +13,13 @@ import { MoreHorizontal, Clock, Flag, ChevronDown } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import DOMPurify from "dompurify";
 
 interface TaskCardProps {
   task: Task;
@@ -40,7 +41,7 @@ const priorityIcons: Record<Priority, React.ReactNode> = {
   urgent: <Flag className="h-3 w-3 fill-current" />,
 };
 
-export function TaskCard({ task, onEdit, onDelete }: TaskCardProps) {
+export function TaskCard({ task, onEdit }: TaskCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const {
     attributes,
@@ -57,6 +58,21 @@ export function TaskCard({ task, onEdit, onDelete }: TaskCardProps) {
     opacity: isDragging ? 0.5 : 1,
   };
 
+  const clickTimeout = useRef<number | null>(null);
+
+  const handleTitleClick = () => {
+    if (clickTimeout.current) {
+      clearTimeout(clickTimeout.current);
+      clickTimeout.current = null;
+      if (onEdit) onEdit(task);
+    } else {
+      clickTimeout.current = window.setTimeout(() => {
+        setIsExpanded((prev) => !prev);
+        clickTimeout.current = null;
+      }, 250);
+    }
+  };
+
   return (
     <Collapsible asChild open={isExpanded} onOpenChange={setIsExpanded}>
       <Card
@@ -68,58 +84,63 @@ export function TaskCard({ task, onEdit, onDelete }: TaskCardProps) {
           <div
             {...attributes}
             {...listeners}
-            className="cursor-grab active:cursor-grabbing p-2"
+            onClick={handleTitleClick}
+            className="flex-1 cursor-pointer"
           >
-            <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium text-foreground leading-tight">
+              {task.title}
+            </CardTitle>
+            {!isExpanded && task.description && (
+              <p className="text-xs text-muted-foreground line-clamp-1 mt-1">
+                {task.description}
+              </p>
+            )}
           </div>
+
           <CollapsibleTrigger asChild>
-            <div className="flex-1 cursor-pointer">
-              <CardTitle className="text-sm font-medium text-foreground leading-tight">
-                {task.title}
-              </CardTitle>
-              {!isExpanded && task.description && (
-                <p className="text-xs text-muted-foreground line-clamp-1 mt-1">
-                  {task.description}
-                </p>
-              )}
-            </div>
+            <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+              <ChevronDown
+                className={`h-4 w-4 transition-transform ${
+                  isExpanded ? "rotate-180" : ""
+                }`}
+              />
+            </Button>
           </CollapsibleTrigger>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-6 w-6 p-0"
-            onClick={(e) => {
-              e.stopPropagation();
-              if (onEdit) onEdit(task);
-            }}
-          >
-            <ChevronDown
-              className={`h-4 w-4 transition-transform ${
-                isExpanded ? "rotate-180" : ""
-              }`}
-            />
-          </Button>
         </div>
 
         <CollapsibleContent>
-          {task.description && (
-            <CardDescription className="px-4 pb-4 text-xs text-muted-foreground">
-              {task.description}
-            </CardDescription>
-          )}
-          <CardContent className="pt-0 px-4 pb-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <Badge
-                variant="outline"
-                className={`text-xs px-2 py-0.5 ${
-                  priorityColors[task.priority]
-                }`}
-              >
-                <span className="flex items-center gap-1">
-                  {priorityIcons[task.priority]}
-                  {task.priority}
-                </span>
-              </Badge>
+          <CardContent className="p-4 pt-0">
+            {task.attachmentUrl && (
+              <div className="mb-2">
+                <img
+                  src={task.attachmentUrl}
+                  alt="Task attachment"
+                  className="max-w-full h-auto rounded-md"
+                />
+              </div>
+            )}
+            {task.description && (
+              <div
+                className="text-sm text-muted-foreground prose dark:prose-invert max-w-none"
+                dangerouslySetInnerHTML={{
+                  __html: DOMPurify.sanitize(task.description),
+                }}
+              />
+            )}
+            <div className="flex items-center justify-between text-xs text-muted-foreground mt-2">
+              <div className="flex items-center gap-1">
+                <Badge
+                  variant="outline"
+                  className={`text-xs px-2 py-0.5 ${
+                    priorityColors[task.priority]
+                  }`}
+                >
+                  <span className="flex items-center gap-1">
+                    {priorityIcons[task.priority]}
+                    {task.priority}
+                  </span>
+                </Badge>
+              </div>
 
               <div className="flex items-center gap-1 text-xs text-muted-foreground">
                 <Clock className="h-3 w-3" />
