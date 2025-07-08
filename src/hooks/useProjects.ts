@@ -15,6 +15,11 @@ import {
 } from "@/types/kanban";
 import { supabase } from "@/integrations/supabase/client";
 
+// Patch the Column type to include 'order' property for type safety
+export interface ColumnWithOrder extends Column {
+  order: number;
+}
+
 export function useProjects() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
@@ -40,8 +45,8 @@ export function useProjects() {
       // Fetch columns
       const { data: columnsData, error: columnsError } = await supabase
         .from("columns")
-        .select("id, title, status, color, project_id")
-        .order("id");
+        .select("id, title, status, color, project_id, order")
+        .order("order", { ascending: true });
       if (columnsError) {
         console.error("Error fetching columns:", columnsError);
         setProjects([]);
@@ -68,36 +73,32 @@ export function useProjects() {
         "done",
         "deployed",
       ];
-      const columnsWithTasks = (columnsData || [])
-        .map((col) => ({
-          id: col.id,
-          title: col.title,
-          status: col.status as TaskStatus,
-          color: col.color,
-          project_id: col.project_id,
-          tasks: Array.isArray(tasksData)
-            ? tasksData
-                .filter(isTaskRow)
-                .filter((t) => t.column_id === col.id)
-                .map((t) => ({
-                  id: t.id,
-                  title: t.title,
-                  description: t.description,
-                  status: t.status as TaskStatus,
-                  priority: t.priority as Priority,
-                  assignee: t.assignee,
-                  tags: undefined,
-                  attachmentUrls: undefined,
-                  comments: undefined,
-                  createdAt: t.created_at,
-                  updatedAt: t.updated_at,
-                }))
-            : [],
-        }))
-        .sort(
-          (a, b) =>
-            COLUMN_ORDER.indexOf(a.status) - COLUMN_ORDER.indexOf(b.status)
-        );
+      const columnsWithTasks = (columnsData || []).map((col) => ({
+        id: col.id,
+        title: col.title,
+        status: col.status as TaskStatus,
+        color: col.color,
+        project_id: col.project_id,
+        order: col.order ?? 0,
+        tasks: Array.isArray(tasksData)
+          ? tasksData
+              .filter(isTaskRow)
+              .filter((t) => t.column_id === col.id)
+              .map((t) => ({
+                id: t.id,
+                title: t.title,
+                description: t.description,
+                status: t.status as TaskStatus,
+                priority: t.priority as Priority,
+                assignee: t.assignee,
+                tags: undefined,
+                attachmentUrls: undefined,
+                comments: undefined,
+                createdAt: t.created_at,
+                updatedAt: t.updated_at,
+              }))
+          : [],
+      }));
 
       // Compose projects with columns
       setProjects(
@@ -190,6 +191,7 @@ export function useProjects() {
           status: col.status as TaskStatus,
           color: col.color,
           project_id: col.project_id,
+          order: col.order ?? 0,
           tasks: [],
         })),
       },
@@ -239,6 +241,16 @@ export function useProjects() {
     projectId: string,
     column: { title: string; status: string; color: string }
   ) => {
+    // Find the current max order for this project's columns
+    const project = projects.find((p) => p.id === projectId);
+    const maxOrder =
+      project && project.columns.length > 0
+        ? Math.max(
+            ...project.columns.map((c) =>
+              "order" in c && typeof c.order === "number" ? c.order : 0
+            )
+          )
+        : 0;
     const now = new Date().toISOString();
     const { data, error } = await supabase
       .from("columns")
@@ -248,6 +260,7 @@ export function useProjects() {
           status: column.status,
           color: column.color,
           project_id: projectId,
+          order: maxOrder + 1,
           created_at: now,
           updated_at: now,
         },
@@ -271,6 +284,7 @@ export function useProjects() {
                   status: data.status as TaskStatus,
                   color: data.color,
                   project_id: data.project_id,
+                  order: data.order ?? 0,
                   tasks: [],
                 },
               ],
@@ -281,6 +295,74 @@ export function useProjects() {
     return data;
   };
 
+  // Delete a column from Supabase and update local state
+  const deleteColumn = async (columnId: string, projectId: string) => {
+    const { error } = await supabase
+      .from("columns")
+      .delete()
+      .eq("id", columnId);
+    if (error) {
+      console.error("Error deleting column:", error);
+      return false;
+    }
+    setProjects((prev) =>
+      prev.map((project) =>
+        project.id === projectId
+          ? {
+              ...project,
+              columns: project.columns.filter((col) => col.id !== columnId),
+            }
+          : project
+      )
+    );
+    return true;
+  };
+
+  // Reorder columns in Supabase and update local state
+  const reorderColumns = async (projectId: string, newOrder: string[]) => {
+    // Find the current project and its columns
+    const project = projects.find((p) => p.id === projectId);
+    if (!project) return;
+    // Build full update objects for upsert
+    const updates = newOrder
+      .map((id, idx) => {
+        const col = project.columns.find((col) => col.id === id);
+        if (!col) return null;
+        return {
+          id: col.id,
+          project_id: col.project_id,
+          title: col.title,
+          status: col.status,
+          color: col.color,
+          order: idx,
+          // Optionally include timestamps if required by your schema
+          // created_at: col.createdAt,
+          // updated_at: new Date().toISOString(),
+        };
+      })
+      .filter(Boolean);
+    if (updates.length === 0) return;
+    const { error } = await supabase.from("columns").upsert(updates);
+    if (error) {
+      console.error("Error reordering columns:", error);
+    }
+    setProjects((prev) =>
+      prev.map((project) =>
+        project.id === projectId
+          ? {
+              ...project,
+              columns: newOrder
+                .map((id, idx) => {
+                  const col = project.columns.find((col) => col.id === id);
+                  return col ? { ...col, order: idx } : undefined;
+                })
+                .filter(Boolean) as Column[],
+            }
+          : project
+      )
+    );
+  };
+
   return {
     projects,
     loading,
@@ -288,5 +370,7 @@ export function useProjects() {
     editProject,
     deleteProject,
     addColumn,
+    deleteColumn,
+    reorderColumns,
   };
 }

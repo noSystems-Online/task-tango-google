@@ -17,28 +17,41 @@ import {
   SortableContext,
   horizontalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { TaskCard } from "./TaskCard";
 import { Task } from "@/types/kanban";
 import { TaskDialog } from "./TaskDialog";
 import { useProjects } from "@/hooks/useProjects";
 import { ProjectSettingsDialog } from "./ProjectSettingsDialog";
 
+const COLUMN_PREFIX = "column-";
+
 interface KanbanBoardProps {
   project: Project;
   onBack: () => void;
+  onColumnsChange?: (columns: Project["columns"]) => void;
 }
 
-export function KanbanBoard({ project, onBack }: KanbanBoardProps) {
-  const { columns, createTask, updateTask, deleteTask, moveTask } = useKanban(
-    project.columns
-  );
+export function KanbanBoard({
+  project,
+  onBack,
+  onColumnsChange,
+}: KanbanBoardProps) {
+  // Keep columns in sync with project.columns prop
+  useEffect(() => {
+    setColumns(project.columns);
+  }, [project.columns]);
+
+  const [columns, setColumns] = useState(project.columns);
+  const { createTask, updateTask, deleteTask, moveTask, reorderColumns } =
+    useKanban(columns);
   const [activeTask, setActiveTask] = useState<Task | null>(null);
+  const [activeColumnId, setActiveColumnId] = useState<string | null>(null);
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [editingColumnId, setEditingColumnId] = useState<string | null>(null);
   const [isSettingsDialogOpen, setIsSettingsDialogOpen] = useState(false);
-  const { updateProject, deleteProject } = useProjects();
+  const { editProject, deleteProject } = useProjects();
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -50,29 +63,55 @@ export function KanbanBoard({ project, onBack }: KanbanBoardProps) {
 
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event;
-    const task = columns
-      .flatMap((col) => col.tasks)
-      .find((task) => task.id === active.id);
-    setActiveTask(task || null);
+    if (typeof active.id === "string" && active.id.startsWith(COLUMN_PREFIX)) {
+      setActiveColumnId(active.id.replace(COLUMN_PREFIX, ""));
+      setActiveTask(null);
+    } else {
+      const task = columns
+        .flatMap((col) => col.tasks)
+        .find((task) => task.id === active.id);
+      setActiveTask(task || null);
+      setActiveColumnId(null);
+    }
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveTask(null);
+    setActiveColumnId(null);
 
     if (!over) return;
 
+    // Handle column drag
+    if (
+      typeof active.id === "string" &&
+      active.id.startsWith(COLUMN_PREFIX) &&
+      typeof over.id === "string" &&
+      over.id.startsWith(COLUMN_PREFIX)
+    ) {
+      const activeColId = active.id.replace(COLUMN_PREFIX, "");
+      const overColId = over.id.replace(COLUMN_PREFIX, "");
+      if (activeColId !== overColId) {
+        const oldIndex = columns.findIndex((col) => col.id === activeColId);
+        const newIndex = columns.findIndex((col) => col.id === overColId);
+        if (oldIndex !== -1 && newIndex !== -1) {
+          const newOrder = arrayMove(columns, oldIndex, newIndex).map(
+            (col, idx) => ({ ...col, order: idx })
+          );
+          reorderColumns(newOrder);
+        }
+      }
+      return;
+    }
+
+    // Handle task drag (move between columns)
     const activeTaskId = active.id as string;
     const overColumnId = over.id as string;
-
     // Find the source column
     const sourceColumn = columns.find((col) =>
       col.tasks.some((task) => task.id === activeTaskId)
     );
-
     if (!sourceColumn) return;
-
-    // If dropping on a different column, move the task
     if (sourceColumn.id !== overColumnId) {
       moveTask(activeTaskId, sourceColumn.id, overColumnId);
     }
@@ -112,7 +151,7 @@ export function KanbanBoard({ project, onBack }: KanbanBoardProps) {
   };
 
   const handleSaveProjectSettings = (updates: Partial<Project>) => {
-    updateProject(project.id, updates);
+    editProject(project.id, updates);
     setIsSettingsDialogOpen(false);
   };
 
@@ -120,6 +159,19 @@ export function KanbanBoard({ project, onBack }: KanbanBoardProps) {
     deleteProject(project.id);
     onBack();
   };
+
+  // Move column up or down
+  function handleMoveColumn(columnId: string, direction: "up" | "down") {
+    const idx = columns.findIndex((col) => col.id === columnId);
+    if (idx === -1) return;
+    const newIndex = direction === "up" ? idx - 1 : idx + 1;
+    if (newIndex < 0 || newIndex >= columns.length) return;
+    const newOrder = arrayMove(columns, idx, newIndex).map((col, i) => ({
+      ...col,
+      order: i,
+    }));
+    reorderColumns(newOrder);
+  }
 
   return (
     <div className="h-full flex flex-col bg-gradient-to-br from-background to-muted/20">
@@ -170,23 +222,32 @@ export function KanbanBoard({ project, onBack }: KanbanBoardProps) {
         >
           <div className="flex gap-6 min-w-max pb-6">
             <SortableContext
-              items={columns.map((col) => col.id)}
+              items={columns.map((col) => COLUMN_PREFIX + col.id)}
               strategy={horizontalListSortingStrategy}
             >
-              {columns.map((column) => (
+              {columns.map((column, idx) => (
                 <KanbanColumn
                   key={column.id}
                   column={column}
                   onAddTask={handleAddTask}
                   onEditTask={handleEditTask}
                   onDeleteTask={deleteTask}
+                  onMoveColumn={handleMoveColumn}
+                  isFirst={idx === 0}
+                  isLast={idx === columns.length - 1}
                 />
               ))}
             </SortableContext>
           </div>
 
           <DragOverlay>
-            {activeTask ? <TaskCard task={activeTask} /> : null}
+            {activeColumnId ? (
+              <div className="w-64 h-10 bg-card rounded shadow flex items-center justify-center font-bold text-lg">
+                {columns.find((c) => c.id === activeColumnId)?.title}
+              </div>
+            ) : activeTask ? (
+              <TaskCard task={activeTask} />
+            ) : null}
           </DragOverlay>
         </DndContext>
       </div>
@@ -202,7 +263,11 @@ export function KanbanBoard({ project, onBack }: KanbanBoardProps) {
         onClose={() => setIsSettingsDialogOpen(false)}
         onSave={handleSaveProjectSettings}
         onDelete={handleDeleteProject}
-        project={project}
+        project={{ ...project, columns }}
+        onColumnsChange={(cols) => {
+          setColumns(cols);
+          if (typeof onColumnsChange === "function") onColumnsChange(cols);
+        }}
       />
     </div>
   );

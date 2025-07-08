@@ -181,11 +181,22 @@ export function useKanban(initialColumns: Column[]) {
     );
   };
 
+  // Add reorderColumns for column drag-and-drop
+  const reorderColumns = async (newOrder: Column[]) => {
+    // Update order in Supabase (update each column's order field)
+    for (let idx = 0; idx < newOrder.length; idx++) {
+      const col = newOrder[idx];
+      await supabase.from("columns").update({ order: idx }).eq("id", col.id);
+    }
+    setColumns(newOrder);
+  };
+
   return {
     columns,
     createTask,
     updateTask,
     deleteTask,
     moveTask,
+    reorderColumns,
   };
 }

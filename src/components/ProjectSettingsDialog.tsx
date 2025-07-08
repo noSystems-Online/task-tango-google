@@ -28,6 +28,24 @@ import {
 } from "./ui/alert-dialog";
 import { AddColumnDialog } from "@/components/AddColumnDialog";
 import { useState } from "react";
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  verticalListSortingStrategy,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { X } from "lucide-react";
+import { useProjects } from "@/hooks/useProjects";
+import { SyntheticListenerMap } from "@dnd-kit/core/dist/hooks/utilities";
 
 const projectSchema = z.object({
   name: z.string().min(1, "Project name is required"),
@@ -40,6 +58,84 @@ interface ProjectSettingsDialogProps {
   onSave: (project: Partial<Project>) => void;
   onDelete: () => void;
   project: Project;
+  onColumnsChange?: (columns: Project["columns"]) => void;
+}
+
+import { ArrowUp, ArrowDown } from "lucide-react";
+
+interface SortableColumnItemProps {
+  col: Project["columns"][number];
+  index: number;
+  total: number;
+  onMoveUp: (id: string) => void;
+  onMoveDown: (id: string) => void;
+  onDelete: (id: string) => void;
+  listeners?: SyntheticListenerMap | undefined;
+  attributes?: React.HTMLAttributes<Element>;
+  isDragging?: boolean;
+}
+
+function SortableColumnItem({
+  col,
+  index,
+  total,
+  onMoveUp,
+  onMoveDown,
+  onDelete,
+  listeners,
+  attributes,
+  isDragging,
+}: SortableColumnItemProps) {
+  const { setNodeRef, transform, transition } = useSortable({ id: col.id });
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.5 : 1,
+      }}
+      className="flex items-center gap-2 px-3 py-1 rounded bg-muted text-xs border mb-1 cursor-move"
+      {...attributes}
+      {...listeners}
+    >
+      <span className="flex-1">{col.title}</span>
+      <div className="flex flex-col gap-0.5 mr-1">
+        <Button
+          type="button"
+          size="icon"
+          variant="ghost"
+          className="h-5 w-5 p-0"
+          onClick={() => onMoveUp(col.id)}
+          title="Move up"
+          disabled={index === 0}
+        >
+          <ArrowUp className="h-4 w-4" />
+        </Button>
+        <Button
+          type="button"
+          size="icon"
+          variant="ghost"
+          className="h-5 w-5 p-0"
+          onClick={() => onMoveDown(col.id)}
+          title="Move down"
+          disabled={index === total - 1}
+        >
+          <ArrowDown className="h-4 w-4" />
+        </Button>
+      </div>
+      <Button
+        type="button"
+        size="icon"
+        variant="ghost"
+        className="h-5 w-5 p-0 text-destructive"
+        onClick={() => onDelete(col.id)}
+        title="Delete column"
+      >
+        <X className="h-4 w-4" />
+      </Button>
+    </div>
+  );
 }
 
 export function ProjectSettingsDialog({
@@ -48,6 +144,7 @@ export function ProjectSettingsDialog({
   onSave,
   onDelete,
   project,
+  onColumnsChange,
 }: ProjectSettingsDialogProps) {
   const {
     control,
@@ -68,6 +165,10 @@ export function ProjectSettingsDialog({
 
   const [addColumnOpen, setAddColumnOpen] = useState(false);
   const [columns, setColumns] = useState(project.columns || []);
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+  );
+  const [draggingId, setDraggingId] = useState<string | null>(null);
 
   // Enforce column order for display
   const COLUMN_ORDER: TaskStatus[] = [
@@ -80,23 +181,50 @@ export function ProjectSettingsDialog({
     (a, b) => COLUMN_ORDER.indexOf(a.status) - COLUMN_ORDER.indexOf(b.status)
   );
 
-  // Add column handler (frontend only, backend logic to be added in hook)
+  const { addColumn, deleteColumn, reorderColumns } = useProjects();
+
+  // Add column handler (should call backend addColumn)
   const handleAddColumn = async (col: {
     title: string;
     status: string;
     color: string;
   }) => {
-    setColumns((prev) => [
-      ...prev,
-      {
-        id: Math.random().toString(36).slice(2),
-        title: col.title,
-        status: col.status as TaskStatus,
-        color: col.color,
-        project_id: project.id,
-        tasks: [],
-      },
-    ]);
+    const newCol = await addColumn(project.id, col);
+    if (newCol) {
+      const updated = [
+        ...columns,
+        { ...newCol, status: newCol.status as TaskStatus, tasks: [] },
+      ];
+      setColumns(updated);
+      onColumnsChange?.(updated);
+    }
+  };
+
+  // Delete column handler (should call backend deleteColumn)
+  const handleDeleteColumn = async (columnId: string) => {
+    const ok = await deleteColumn(columnId, project.id);
+    if (ok) {
+      const updated = columns.filter((col) => col.id !== columnId);
+      setColumns(updated);
+      onColumnsChange?.(updated);
+    }
+  };
+
+  // Drag-and-drop reorder handler (should call backend reorderColumns)
+  const handleDragEnd = (event: DragEndEvent) => {
+    setDraggingId(null);
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = columns.findIndex((col) => col.id === active.id);
+    const newIndex = columns.findIndex((col) => col.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+    const newColumns = arrayMove(columns, oldIndex, newIndex);
+    setColumns(newColumns);
+    reorderColumns(
+      project.id,
+      newColumns.map((col) => col.id)
+    );
+    onColumnsChange?.(newColumns);
   };
 
   return (
@@ -126,19 +254,59 @@ export function ProjectSettingsDialog({
               render={({ field }) => <Textarea id="description" {...field} />}
             />
           </div>
-          {/* Columns List (ordered) */}
+          {/* Columns List (drag-and-drop, delete) */}
           <div className="grid gap-2">
             <Label>Columns (Order)</Label>
-            <div className="flex gap-2 flex-wrap mb-2">
-              {orderedColumns.map((col) => (
-                <span
-                  key={col.id}
-                  className="px-3 py-1 rounded bg-muted text-xs border"
-                >
-                  {col.title}
-                </span>
-              ))}
-            </div>
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragStart={({ active }) => setDraggingId(active.id as string)}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext
+                items={columns.map((col) => col.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                {columns.map((col, idx) => (
+                  <SortableColumnItem
+                    key={col.id}
+                    col={col}
+                    index={idx}
+                    total={columns.length}
+                    isDragging={draggingId === col.id}
+                    onDelete={handleDeleteColumn}
+                    onMoveUp={() => {
+                      if (idx === 0) return;
+                      const newColumns = [...columns];
+                      [newColumns[idx - 1], newColumns[idx]] = [
+                        newColumns[idx],
+                        newColumns[idx - 1],
+                      ];
+                      setColumns(newColumns);
+                      reorderColumns(
+                        project.id,
+                        newColumns.map((c) => c.id)
+                      );
+                      onColumnsChange?.(newColumns);
+                    }}
+                    onMoveDown={() => {
+                      if (idx === columns.length - 1) return;
+                      const newColumns = [...columns];
+                      [newColumns[idx], newColumns[idx + 1]] = [
+                        newColumns[idx + 1],
+                        newColumns[idx],
+                      ];
+                      setColumns(newColumns);
+                      reorderColumns(
+                        project.id,
+                        newColumns.map((c) => c.id)
+                      );
+                      onColumnsChange?.(newColumns);
+                    }}
+                  />
+                ))}
+              </SortableContext>
+            </DndContext>
             <Button
               type="button"
               size="sm"

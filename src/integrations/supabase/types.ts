@@ -23,6 +23,7 @@ export type Database = {
           color: string | null;
           created_at: string;
           updated_at: string;
+          order: number;
         };
         Insert: {
           id?: string;
@@ -32,6 +33,7 @@ export type Database = {
           color?: string | null;
           created_at?: string;
           updated_at?: string;
+          order?: number;
         };
         Update: {
           id?: string;
@@ -41,6 +43,7 @@ export type Database = {
           color?: string | null;
           created_at?: string;
           updated_at?: string;
+          order?: number;
         };
         Relationships: [
           {
