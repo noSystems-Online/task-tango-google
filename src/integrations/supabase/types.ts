@@ -90,6 +90,7 @@ export type Database = {
           name: string;
           updated_at: string;
           user_id: string;
+          deleted: boolean;
         };
         Insert: {
           created_at?: string;
@@ -98,6 +99,7 @@ export type Database = {
           name: string;
           updated_at?: string;
           user_id: string;
+          deleted?: boolean;
         };
         Update: {
           created_at?: string;
@@ -106,6 +108,7 @@ export type Database = {
           name?: string;
           updated_at?: string;
           user_id?: string;
+          deleted?: boolean;
         };
         Relationships: [];
       };

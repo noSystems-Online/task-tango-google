@@ -116,13 +116,13 @@ export function useProjects() {
     fetchAll();
   }, []);
   const deleteProject = async (projectId: string) => {
-    // Delete project from Supabase (will cascade to columns/tasks if set up)
+    // Soft delete: set deleted=true
     const { error } = await supabase
       .from("projects")
-      .delete()
+      .update({ deleted: true })
       .eq("id", projectId);
     if (error) {
-      console.error("Error deleting project:", error);
+      console.error("Error soft deleting project:", error);
       return;
     }
     // Always refetch after deletion to ensure global sync
