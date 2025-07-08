@@ -159,7 +159,12 @@ export function ProjectSettingsDialog({
   });
 
   const onSubmit = (data: z.infer<typeof projectSchema>) => {
-    onSave({ ...project, ...data });
+    // Only send valid fields to onSave (no columns array)
+    onSave({
+      id: project.id,
+      name: data.name,
+      description: data.description,
+    });
     onClose();
   };
 
