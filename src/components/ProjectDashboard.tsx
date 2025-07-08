@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Project } from "@/types/kanban";
-import { useProjects } from "@/hooks/useProjects";
+import { useProjectContext } from "@/context/useProjectContext";
 import { ProjectCard } from "./ProjectCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,7 +24,7 @@ interface ProjectDashboardProps {
 
 export function ProjectDashboard({ onOpenProject }: ProjectDashboardProps) {
   const { projects, loading, createProject, deleteProject, editProject } =
-    useProjects();
+    useProjectContext();
   const [searchQuery, setSearchQuery] = useState("");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");

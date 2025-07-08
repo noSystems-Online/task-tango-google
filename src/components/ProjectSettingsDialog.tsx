@@ -44,7 +44,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { X } from "lucide-react";
-import { useProjects } from "@/hooks/useProjects";
+import { useProjectContext } from "@/context/useProjectContext";
 import { SyntheticListenerMap } from "@dnd-kit/core/dist/hooks/utilities";
 
 const projectSchema = z.object({
@@ -181,7 +181,7 @@ export function ProjectSettingsDialog({
     (a, b) => COLUMN_ORDER.indexOf(a.status) - COLUMN_ORDER.indexOf(b.status)
   );
 
-  const { addColumn, deleteColumn, reorderColumns } = useProjects();
+  const { addColumn, deleteColumn, reorderColumns } = useProjectContext();
 
   // Add column handler (should call backend addColumn)
   const handleAddColumn = async (col: {

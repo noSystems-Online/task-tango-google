@@ -21,7 +21,7 @@ import React, { useState, useEffect } from "react";
 import { TaskCard } from "./TaskCard";
 import { Task } from "@/types/kanban";
 import { TaskDialog } from "./TaskDialog";
-import { useProjects } from "@/hooks/useProjects";
+import { useProjectContext } from "@/context/useProjectContext";
 import { ProjectSettingsDialog } from "./ProjectSettingsDialog";
 
 const COLUMN_PREFIX = "column-";
@@ -30,19 +30,19 @@ interface KanbanBoardProps {
   project: Project;
   onBack: () => void;
   onColumnsChange?: (columns: Project["columns"]) => void;
+  onProjectDeleted?: () => void;
 }
 
 export function KanbanBoard({
   project,
   onBack,
   onColumnsChange,
+  onProjectDeleted,
 }: KanbanBoardProps) {
-  // Keep columns in sync with project.columns prop
+  const [columns, setColumns] = useState(project.columns);
   useEffect(() => {
     setColumns(project.columns);
   }, [project.columns]);
-
-  const [columns, setColumns] = useState(project.columns);
   const { createTask, updateTask, deleteTask, moveTask, reorderColumns } =
     useKanban(columns);
   const [activeTask, setActiveTask] = useState<Task | null>(null);
@@ -51,7 +51,7 @@ export function KanbanBoard({
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [editingColumnId, setEditingColumnId] = useState<string | null>(null);
   const [isSettingsDialogOpen, setIsSettingsDialogOpen] = useState(false);
-  const { editProject, deleteProject } = useProjects();
+  const { editProject, deleteProject } = useProjectContext();
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -157,7 +157,11 @@ export function KanbanBoard({
 
   const handleDeleteProject = () => {
     deleteProject(project.id);
-    onBack();
+    if (onProjectDeleted) {
+      onProjectDeleted();
+    } else {
+      onBack();
+    }
   };
 
   // Move column up or down

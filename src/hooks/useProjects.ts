@@ -24,96 +24,97 @@ export function useProjects() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchAll = async () => {
-      setLoading(true);
-      // Fetch projects
-      const { data: projectsData, error: projectsError } = await supabase
-        .from("projects")
-        .select("id, name, description, created_at, updated_at")
-        .order("created_at", { ascending: false });
-      if (projectsError) {
-        console.error("Error fetching projects:", projectsError);
-        setProjects([]);
-        return;
-      }
-      if (!projectsData) {
-        setProjects([]);
-        return;
-      }
-
-      // Fetch columns
-      const { data: columnsData, error: columnsError } = await supabase
-        .from("columns")
-        .select("id, title, status, color, project_id, order")
-        .order("order", { ascending: true });
-      if (columnsError) {
-        console.error("Error fetching columns:", columnsError);
-        setProjects([]);
-        return;
-      }
-
-      // Fetch tasks
-      const { data: tasksData, error: tasksError } = await supabase
-        .from("tasks")
-        .select(
-          "id, title, description, status, priority, assignee, created_at, updated_at, column_id"
-        )
-        .order("created_at");
-      if (tasksError) {
-        console.error("Error fetching tasks:", tasksError);
-        setProjects([]);
-        return;
-      }
-
-      // Compose columns with tasks, and sort columns by desired order
-      const COLUMN_ORDER: TaskStatus[] = [
-        "todo",
-        "in-progress",
-        "done",
-        "deployed",
-      ];
-      const columnsWithTasks = (columnsData || []).map((col) => ({
-        id: col.id,
-        title: col.title,
-        status: col.status as TaskStatus,
-        color: col.color,
-        project_id: col.project_id,
-        order: col.order ?? 0,
-        tasks: Array.isArray(tasksData)
-          ? tasksData
-              .filter(isTaskRow)
-              .filter((t) => t.column_id === col.id)
-              .map((t) => ({
-                id: t.id,
-                title: t.title,
-                description: t.description,
-                status: t.status as TaskStatus,
-                priority: t.priority as Priority,
-                assignee: t.assignee,
-                tags: undefined,
-                attachmentUrls: undefined,
-                comments: undefined,
-                createdAt: t.created_at,
-                updatedAt: t.updated_at,
-              }))
-          : [],
-      }));
-
-      // Compose projects with columns
-      setProjects(
-        (projectsData || []).map((p) => ({
-          id: p.id,
-          name: p.name,
-          description: p.description,
-          createdAt: p.created_at,
-          updatedAt: p.updated_at,
-          columns: columnsWithTasks.filter((col) => col.project_id === p.id),
-        }))
-      );
+  // Expose fetchAll for context usage
+  const fetchAll = async () => {
+    setLoading(true);
+    // Fetch projects
+    const { data: projectsData, error: projectsError } = await supabase
+      .from("projects")
+      .select("id, name, description, created_at, updated_at")
+      .order("created_at", { ascending: false });
+    if (projectsError) {
+      console.error("Error fetching projects:", projectsError);
+      setProjects([]);
       setLoading(false);
-    };
+      return;
+    }
+    if (!projectsData) {
+      setProjects([]);
+      setLoading(false);
+      return;
+    }
+
+    // Fetch columns
+    const { data: columnsData, error: columnsError } = await supabase
+      .from("columns")
+      .select("id, title, status, color, project_id, order")
+      .order("order", { ascending: true });
+    if (columnsError) {
+      console.error("Error fetching columns:", columnsError);
+      setProjects([]);
+      setLoading(false);
+      return;
+    }
+
+    // Fetch tasks
+    const { data: tasksData, error: tasksError } = await supabase
+      .from("tasks")
+      .select(
+        "id, title, description, status, priority, assignee, created_at, updated_at, column_id"
+      )
+      .order("created_at");
+    if (tasksError) {
+      console.error("Error fetching tasks:", tasksError);
+      setProjects([]);
+      setLoading(false);
+      return;
+    }
+
+    // Compose columns with tasks, and sort columns by desired order
+    const columnsWithTasks = (columnsData || []).map((col) => ({
+      id: col.id,
+      title: col.title,
+      status: col.status as TaskStatus,
+      color: col.color,
+      project_id: col.project_id,
+      order: col.order ?? 0,
+      tasks: Array.isArray(tasksData)
+        ? tasksData
+            .filter(isTaskRow)
+            .filter((t) => t.column_id === col.id)
+            .map((t) => ({
+              id: t.id,
+              title: t.title,
+              description: t.description,
+              status: t.status as TaskStatus,
+              priority: t.priority as Priority,
+              assignee: t.assignee,
+              tags: undefined,
+              attachmentUrls: undefined,
+              comments: undefined,
+              createdAt: t.created_at,
+              updatedAt: t.updated_at,
+            }))
+        : [],
+    }));
+
+    // Compose projects with columns
+    setProjects(
+      (projectsData || []).map((p) => ({
+        id: p.id,
+        name: p.name,
+        description: p.description,
+        createdAt: p.created_at,
+        updatedAt: p.updated_at,
+        columns: columnsWithTasks.filter((col) => col.project_id === p.id),
+      }))
+    );
+    setLoading(false);
+  };
+
+  useEffect(() => {
     fetchAll();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const deleteProject = async (projectId: string) => {
     // Delete project from Supabase (will cascade to columns/tasks if set up)
@@ -125,7 +126,8 @@ export function useProjects() {
       console.error("Error deleting project:", error);
       return;
     }
-    setProjects((prev) => prev.filter((project) => project.id !== projectId));
+    // Always refetch after deletion to ensure global sync
+    await fetchAll();
   };
 
   const createProject = async (name: string, description?: string) => {
@@ -284,7 +286,7 @@ export function useProjects() {
                   status: data.status as TaskStatus,
                   color: data.color,
                   project_id: data.project_id,
-                  order: data.order ?? 0,
+                  order: data.order ?? maxOrder + 1,
                   tasks: [],
                 },
               ],
@@ -372,5 +374,6 @@ export function useProjects() {
     addColumn,
     deleteColumn,
     reorderColumns,
+    fetchAll, // Expose fetchAll for context
   };
 }

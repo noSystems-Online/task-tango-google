@@ -8,15 +8,17 @@ const Index = () => {
     "dashboard"
   );
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [projectListVersion, setProjectListVersion] = useState(0);
 
   const handleOpenProject = (project: Project) => {
     setSelectedProject(project);
     setCurrentView("board");
   };
 
-  const handleBackToDashboard = () => {
+  const handleBackToDashboard = (projectDeleted?: boolean) => {
     setCurrentView("dashboard");
     setSelectedProject(null);
+    if (projectDeleted) setProjectListVersion((v) => v + 1);
   };
 
   const handleColumnsChange = (columns: Project["columns"]) => {
@@ -27,13 +29,19 @@ const Index = () => {
     return (
       <KanbanBoard
         project={selectedProject}
-        onBack={handleBackToDashboard}
+        onBack={() => handleBackToDashboard(false)}
+        onProjectDeleted={() => handleBackToDashboard(true)}
         onColumnsChange={handleColumnsChange}
       />
     );
   }
 
-  return <ProjectDashboard onOpenProject={handleOpenProject} />;
+  return (
+    <ProjectDashboard
+      key={projectListVersion}
+      onOpenProject={handleOpenProject}
+    />
+  );
 };
 
 export default Index;
