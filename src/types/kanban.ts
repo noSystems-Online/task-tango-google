@@ -30,7 +30,7 @@ export interface Project {
   columns: Column[];
 }
 
-export type TaskStatus = "todo" | "in-progress" | "review" | "done";
+export type TaskStatus = "todo" | "in-progress" | "done" | "deployed";
 
 export type Priority = "low" | "medium" | "high" | "urgent";
 
@@ -51,17 +51,17 @@ export const DEFAULT_COLUMNS: Omit<Column, "tasks">[] = [
     project_id: "",
   },
   {
-    id: "review",
-    title: "Review",
-    status: "review",
-    color: "status-review",
-    project_id: "",
-  },
-  {
     id: "done",
     title: "Done",
     status: "done",
     color: "status-done",
+    project_id: "",
+  },
+  {
+    id: "deployed",
+    title: "Deployed",
+    status: "deployed",
+    color: "status-deployed",
     project_id: "",
   },
 ];
