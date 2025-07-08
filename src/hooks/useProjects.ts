@@ -60,7 +60,7 @@ export function useProjects() {
     const { data: tasksData, error: tasksError } = await supabase
       .from("tasks")
       .select(
-        "id, title, description, status, priority, assignee, created_at, updated_at, column_id"
+        "id, title, description, status, priority, assignee, created_at, updated_at, column_id, deleted"
       )
       .order("created_at");
     if (tasksError) {
@@ -81,7 +81,7 @@ export function useProjects() {
       tasks: Array.isArray(tasksData)
         ? tasksData
             .filter(isTaskRow)
-            .filter((t) => t.column_id === col.id)
+            .filter((t) => t.column_id === col.id && !t.deleted)
             .map((t) => ({
               id: t.id,
               title: t.title,

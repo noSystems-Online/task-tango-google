@@ -122,6 +122,7 @@ export type Database = {
           updated_at: string;
           user_id: string;
           column_id: string | null;
+          deleted: boolean;
         };
         Insert: {
           assignee?: string | null;
@@ -135,6 +136,7 @@ export type Database = {
           updated_at?: string;
           user_id: string;
           column_id?: string | null;
+          deleted?: boolean;
         };
         Update: {
           assignee?: string | null;
@@ -148,6 +150,7 @@ export type Database = {
           updated_at?: string;
           user_id?: string;
           column_id?: string | null;
+          deleted?: boolean;
         };
         Relationships: [
           {

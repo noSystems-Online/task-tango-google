@@ -123,13 +123,27 @@ export function useKanban(initialColumns: Column[]) {
     );
   };
 
-  const deleteTask = (taskId: string) => {
+  const deleteTask = async (taskId: string) => {
+    // Save previous state for rollback
+    const prevColumns = columns;
+    // Optimistically update UI
     setColumns((prev) =>
       prev.map((column) => ({
         ...column,
         tasks: column.tasks.filter((task) => task.id !== taskId),
       }))
     );
+
+    // Delete from Supabase
+    const { error } = await supabase.from("tasks").delete().eq("id", taskId);
+    if (error) {
+      // Rollback UI state
+      setColumns(prevColumns);
+      // Optionally: show error to user (could use toast/snackbar)
+      // eslint-disable-next-line no-console
+      console.error("Failed to delete task:", error.message || error);
+      throw error;
+    }
   };
 
   const moveTask = async (
