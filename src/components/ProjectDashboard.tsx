@@ -1,37 +1,65 @@
-import { useState } from 'react';
-import { Project } from '@/types/kanban';
-import { useProjects } from '@/hooks/useProjects';
-import { ProjectCard } from './ProjectCard';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
-import { Plus, Search, Filter } from 'lucide-react';
+import { useState } from "react";
+import { Project } from "@/types/kanban";
+import { useProjects } from "@/hooks/useProjects";
+import { ProjectCard } from "./ProjectCard";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Plus, Search, Filter } from "lucide-react";
+import { EditProjectDialog } from "@/components/EditProjectDialog";
 
 interface ProjectDashboardProps {
   onOpenProject: (project: Project) => void;
 }
 
 export function ProjectDashboard({ onOpenProject }: ProjectDashboardProps) {
-  const { projects, createProject } = useProjects();
-  const [searchQuery, setSearchQuery] = useState('');
+  const { projects, loading, createProject, deleteProject, editProject } =
+    useProjects();
+  const [searchQuery, setSearchQuery] = useState("");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [newProjectName, setNewProjectName] = useState('');
-  const [newProjectDescription, setNewProjectDescription] = useState('');
+  const [newProjectName, setNewProjectName] = useState("");
+  const [newProjectDescription, setNewProjectDescription] = useState("");
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
 
-  const filteredProjects = projects.filter(project =>
-    project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    project.description?.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredProjects = projects.filter(
+    (project) =>
+      project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      project.description?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const handleCreateProject = () => {
     if (newProjectName.trim()) {
-      createProject(newProjectName.trim(), newProjectDescription.trim() || undefined);
-      setNewProjectName('');
-      setNewProjectDescription('');
+      createProject(
+        newProjectName.trim(),
+        newProjectDescription.trim() || undefined
+      );
+      setNewProjectName("");
+      setNewProjectDescription("");
       setIsCreateDialogOpen(false);
     }
+  };
+
+  const handleEditProject = (project: Project) => {
+    setEditingProject(project);
+    setEditDialogOpen(true);
+  };
+
+  const handleSaveEdit = async (
+    projectId: string,
+    updates: { name: string; description: string }
+  ) => {
+    await editProject(projectId, updates);
   };
 
   return (
@@ -41,13 +69,18 @@ export function ProjectDashboard({ onOpenProject }: ProjectDashboardProps) {
         <div className="container mx-auto px-6 py-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-foreground">Project Dashboard</h1>
+              <h1 className="text-3xl font-bold text-foreground">
+                Project Dashboard
+              </h1>
               <p className="text-muted-foreground mt-1">
                 Manage your projects and kanban boards
               </p>
             </div>
 
-            <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+            <Dialog
+              open={isCreateDialogOpen}
+              onOpenChange={setIsCreateDialogOpen}
+            >
               <DialogTrigger asChild>
                 <Button className="gap-2 bg-gradient-to-r from-primary to-accent hover:opacity-90">
                   <Plus className="h-4 w-4" />
@@ -58,7 +91,8 @@ export function ProjectDashboard({ onOpenProject }: ProjectDashboardProps) {
                 <DialogHeader>
                   <DialogTitle>Create New Project</DialogTitle>
                   <DialogDescription>
-                    Create a new project with a kanban board to manage your tasks.
+                    Create a new project with a kanban board to manage your
+                    tasks.
                   </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
@@ -119,7 +153,11 @@ export function ProjectDashboard({ onOpenProject }: ProjectDashboardProps) {
 
       {/* Projects Grid */}
       <div className="container mx-auto px-6 py-8">
-        {filteredProjects.length === 0 ? (
+        {loading ? (
+          <div className="flex justify-center items-center py-24">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary" />
+          </div>
+        ) : filteredProjects.length === 0 ? (
           <div className="text-center py-12">
             {projects.length === 0 ? (
               <div className="max-w-sm mx-auto">
@@ -130,7 +168,8 @@ export function ProjectDashboard({ onOpenProject }: ProjectDashboardProps) {
                   No projects yet
                 </h3>
                 <p className="text-muted-foreground mb-4">
-                  Create your first project to start managing tasks with kanban boards.
+                  Create your first project to start managing tasks with kanban
+                  boards.
                 </p>
                 <Button
                   onClick={() => setIsCreateDialogOpen(true)}
@@ -158,11 +197,19 @@ export function ProjectDashboard({ onOpenProject }: ProjectDashboardProps) {
                 key={project.id}
                 project={project}
                 onOpenProject={onOpenProject}
+                onDeleteProject={deleteProject}
+                onEditProject={handleEditProject}
               />
             ))}
           </div>
         )}
       </div>
+      <EditProjectDialog
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        project={editingProject}
+        onSave={handleSaveEdit}
+      />
     </div>
   );
 }

@@ -17,9 +17,11 @@ import { supabase } from "@/integrations/supabase/client";
 
 export function useProjects() {
   const [projects, setProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchAll = async () => {
+      setLoading(true);
       // Fetch projects
       const { data: projectsData, error: projectsError } = await supabase
         .from("projects")
@@ -59,32 +61,43 @@ export function useProjects() {
         return;
       }
 
-      // Compose columns with tasks
-      const columnsWithTasks = (columnsData || []).map((col) => ({
-        id: col.id,
-        title: col.title,
-        status: col.status as TaskStatus,
-        color: col.color,
-        project_id: col.project_id,
-        tasks: Array.isArray(tasksData)
-          ? tasksData
-              .filter(isTaskRow)
-              .filter((t) => t.column_id === col.id)
-              .map((t) => ({
-                id: t.id,
-                title: t.title,
-                description: t.description,
-                status: t.status as TaskStatus,
-                priority: t.priority as Priority,
-                assignee: t.assignee,
-                tags: undefined,
-                attachmentUrls: undefined,
-                comments: undefined,
-                createdAt: t.created_at,
-                updatedAt: t.updated_at,
-              }))
-          : [],
-      }));
+      // Compose columns with tasks, and sort columns by desired order
+      const COLUMN_ORDER: TaskStatus[] = [
+        "todo",
+        "in-progress",
+        "done",
+        "deployed",
+      ];
+      const columnsWithTasks = (columnsData || [])
+        .map((col) => ({
+          id: col.id,
+          title: col.title,
+          status: col.status as TaskStatus,
+          color: col.color,
+          project_id: col.project_id,
+          tasks: Array.isArray(tasksData)
+            ? tasksData
+                .filter(isTaskRow)
+                .filter((t) => t.column_id === col.id)
+                .map((t) => ({
+                  id: t.id,
+                  title: t.title,
+                  description: t.description,
+                  status: t.status as TaskStatus,
+                  priority: t.priority as Priority,
+                  assignee: t.assignee,
+                  tags: undefined,
+                  attachmentUrls: undefined,
+                  comments: undefined,
+                  createdAt: t.created_at,
+                  updatedAt: t.updated_at,
+                }))
+            : [],
+        }))
+        .sort(
+          (a, b) =>
+            COLUMN_ORDER.indexOf(a.status) - COLUMN_ORDER.indexOf(b.status)
+        );
 
       // Compose projects with columns
       setProjects(
@@ -97,9 +110,22 @@ export function useProjects() {
           columns: columnsWithTasks.filter((col) => col.project_id === p.id),
         }))
       );
+      setLoading(false);
     };
     fetchAll();
   }, []);
+  const deleteProject = async (projectId: string) => {
+    // Delete project from Supabase (will cascade to columns/tasks if set up)
+    const { error } = await supabase
+      .from("projects")
+      .delete()
+      .eq("id", projectId);
+    if (error) {
+      console.error("Error deleting project:", error);
+      return;
+    }
+    setProjects((prev) => prev.filter((project) => project.id !== projectId));
+  };
 
   const createProject = async (name: string, description?: string) => {
     // Get current user from Supabase auth
@@ -171,24 +197,96 @@ export function useProjects() {
     return projectData;
   };
 
-  const updateProject = (projectId: string, updates: Partial<Project>) => {
+  /**
+   * Update a project in Supabase and local state.
+   * @param projectId The project ID to update
+   * @param updates Object with name and/or description
+   */
+  const editProject = async (
+    projectId: string,
+    updates: { name?: string; description?: string | null }
+  ) => {
+    const { data, error } = await supabase
+      .from("projects")
+      .update({
+        ...updates,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", projectId)
+      .select()
+      .single();
+    if (error) {
+      console.error("Error updating project:", error);
+      return null;
+    }
     setProjects((prev) =>
       prev.map((project) =>
         project.id === projectId
-          ? { ...project, ...updates, updatedAt: new Date().toISOString() }
+          ? {
+              ...project,
+              name: data.name,
+              description: data.description,
+              updatedAt: data.updated_at,
+            }
           : project
       )
     );
+    return data;
   };
 
-  const deleteProject = (projectId: string) => {
-    setProjects((prev) => prev.filter((project) => project.id !== projectId));
+  // Add a new column to a project in Supabase and update local state
+  const addColumn = async (
+    projectId: string,
+    column: { title: string; status: string; color: string }
+  ) => {
+    const now = new Date().toISOString();
+    const { data, error } = await supabase
+      .from("columns")
+      .insert([
+        {
+          title: column.title,
+          status: column.status,
+          color: column.color,
+          project_id: projectId,
+          created_at: now,
+          updated_at: now,
+        },
+      ])
+      .select()
+      .single();
+    if (error || !data) {
+      console.error("Error adding column:", error);
+      return null;
+    }
+    setProjects((prev) =>
+      prev.map((project) =>
+        project.id === projectId
+          ? {
+              ...project,
+              columns: [
+                ...project.columns,
+                {
+                  id: data.id,
+                  title: data.title,
+                  status: data.status as TaskStatus,
+                  color: data.color,
+                  project_id: data.project_id,
+                  tasks: [],
+                },
+              ],
+            }
+          : project
+      )
+    );
+    return data;
   };
 
   return {
     projects,
+    loading,
     createProject,
-    updateProject,
+    editProject,
     deleteProject,
+    addColumn,
   };
 }

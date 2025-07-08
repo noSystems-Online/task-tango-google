@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Project } from "@/types/kanban";
+import { Project, TaskStatus } from "@/types/kanban";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -26,6 +26,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "./ui/alert-dialog";
+import { AddColumnDialog } from "@/components/AddColumnDialog";
+import { useState } from "react";
 
 const projectSchema = z.object({
   name: z.string().min(1, "Project name is required"),
@@ -64,6 +66,39 @@ export function ProjectSettingsDialog({
     onClose();
   };
 
+  const [addColumnOpen, setAddColumnOpen] = useState(false);
+  const [columns, setColumns] = useState(project.columns || []);
+
+  // Enforce column order for display
+  const COLUMN_ORDER: TaskStatus[] = [
+    "todo",
+    "in-progress",
+    "done",
+    "deployed",
+  ];
+  const orderedColumns = [...columns].sort(
+    (a, b) => COLUMN_ORDER.indexOf(a.status) - COLUMN_ORDER.indexOf(b.status)
+  );
+
+  // Add column handler (frontend only, backend logic to be added in hook)
+  const handleAddColumn = async (col: {
+    title: string;
+    status: string;
+    color: string;
+  }) => {
+    setColumns((prev) => [
+      ...prev,
+      {
+        id: Math.random().toString(36).slice(2),
+        title: col.title,
+        status: col.status as TaskStatus,
+        color: col.color,
+        project_id: project.id,
+        tasks: [],
+      },
+    ]);
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent>
@@ -90,6 +125,28 @@ export function ProjectSettingsDialog({
               control={control}
               render={({ field }) => <Textarea id="description" {...field} />}
             />
+          </div>
+          {/* Columns List (ordered) */}
+          <div className="grid gap-2">
+            <Label>Columns (Order)</Label>
+            <div className="flex gap-2 flex-wrap mb-2">
+              {orderedColumns.map((col) => (
+                <span
+                  key={col.id}
+                  className="px-3 py-1 rounded bg-muted text-xs border"
+                >
+                  {col.title}
+                </span>
+              ))}
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => setAddColumnOpen(true)}
+            >
+              + Add Column
+            </Button>
           </div>
           <DialogFooter>
             <AlertDialog>
@@ -121,6 +178,11 @@ export function ProjectSettingsDialog({
             <Button type="submit">Save Changes</Button>
           </DialogFooter>
         </form>
+        <AddColumnDialog
+          open={addColumnOpen}
+          onOpenChange={setAddColumnOpen}
+          onAdd={handleAddColumn}
+        />
       </DialogContent>
     </Dialog>
   );
