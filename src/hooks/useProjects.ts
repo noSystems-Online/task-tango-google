@@ -101,17 +101,74 @@ export function useProjects() {
     fetchAll();
   }, []);
 
-  const createProject = (name: string, description?: string) => {
-    const newProject: Project = {
-      id: Date.now().toString(),
-      name,
-      description,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      columns: DEFAULT_COLUMNS.map((col) => ({ ...col, tasks: [] })),
-    };
-    setProjects((prev) => [...prev, newProject]);
-    return newProject;
+  const createProject = async (name: string, description?: string) => {
+    // Get current user from Supabase auth
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+    if (userError || !user) {
+      console.error("No authenticated user found.", userError);
+      return null;
+    }
+    const { data: projectData, error: projectError } = await supabase
+      .from("projects")
+      .insert([
+        {
+          name,
+          description: description || null,
+          user_id: user.id,
+        },
+      ])
+      .select()
+      .single();
+    if (projectError || !projectData) {
+      console.error("Error creating project:", projectError);
+      return null;
+    }
+
+    // Insert default columns for this project
+    const now = new Date().toISOString();
+    const columnsToInsert = DEFAULT_COLUMNS.map((col) => ({
+      title: col.title,
+      status: col.status,
+      color: col.color,
+      project_id: projectData.id,
+      created_at: now,
+      updated_at: now,
+    }));
+    const { data: columnsData, error: columnsError } = await supabase
+      .from("columns")
+      .insert(columnsToInsert)
+      .select();
+    if (columnsError) {
+      console.error("Error creating columns:", columnsError);
+    }
+
+    // Optionally, you can fetch the updated list or append to local state
+    // For now, just trigger a refetch by calling fetchAll
+    // (Or you can push to setProjects if you want instant UI update)
+    // await fetchAll();
+    // Or, for instant update:
+    setProjects((prev) => [
+      ...prev,
+      {
+        id: projectData.id,
+        name: projectData.name,
+        description: projectData.description,
+        createdAt: projectData.created_at,
+        updatedAt: projectData.updated_at,
+        columns: (columnsData || []).map((col) => ({
+          id: col.id,
+          title: col.title,
+          status: col.status as TaskStatus,
+          color: col.color,
+          project_id: col.project_id,
+          tasks: [],
+        })),
+      },
+    ]);
+    return projectData;
   };
 
   const updateProject = (projectId: string, updates: Partial<Project>) => {
