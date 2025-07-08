@@ -1,13 +1,28 @@
-import { Project } from '@/types/kanban';
-import { useKanban } from '@/hooks/useKanban';
-import { KanbanColumn } from './KanbanColumn';
-import { Button } from '@/components/ui/button';
-import { ArrowLeft, Settings } from 'lucide-react';
-import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
-import { arrayMove, SortableContext, horizontalListSortingStrategy } from '@dnd-kit/sortable';
-import { useState } from 'react';
-import { TaskCard } from './TaskCard';
-import { Task } from '@/types/kanban';
+import { Project } from "@/types/kanban";
+import { useKanban } from "@/hooks/useKanban";
+import { KanbanColumn } from "./KanbanColumn";
+import { Button } from "@/components/ui/button";
+import { ArrowLeft, Settings } from "lucide-react";
+import {
+  DndContext,
+  DragEndEvent,
+  DragOverlay,
+  DragStartEvent,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  horizontalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { useState } from "react";
+import { TaskCard } from "./TaskCard";
+import { Task } from "@/types/kanban";
+import { TaskDialog } from "./TaskDialog";
+import { useProjects } from "@/hooks/useProjects";
+import { ProjectSettingsDialog } from "./ProjectSettingsDialog";
 
 interface KanbanBoardProps {
   project: Project;
@@ -15,9 +30,16 @@ interface KanbanBoardProps {
 }
 
 export function KanbanBoard({ project, onBack }: KanbanBoardProps) {
-  const { columns, createTask, updateTask, deleteTask, moveTask } = useKanban(project.columns);
+  const { columns, createTask, updateTask, deleteTask, moveTask } = useKanban(
+    project.columns
+  );
   const [activeTask, setActiveTask] = useState<Task | null>(null);
-  
+  const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [editingColumnId, setEditingColumnId] = useState<string | null>(null);
+  const [isSettingsDialogOpen, setIsSettingsDialogOpen] = useState(false);
+  const { updateProject, deleteProject } = useProjects();
+
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -29,8 +51,8 @@ export function KanbanBoard({ project, onBack }: KanbanBoardProps) {
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event;
     const task = columns
-      .flatMap(col => col.tasks)
-      .find(task => task.id === active.id);
+      .flatMap((col) => col.tasks)
+      .find((task) => task.id === active.id);
     setActiveTask(task || null);
   };
 
@@ -44,8 +66,8 @@ export function KanbanBoard({ project, onBack }: KanbanBoardProps) {
     const overColumnId = over.id as string;
 
     // Find the source column
-    const sourceColumn = columns.find(col => 
-      col.tasks.some(task => task.id === activeTaskId)
+    const sourceColumn = columns.find((col) =>
+      col.tasks.some((task) => task.id === activeTaskId)
     );
 
     if (!sourceColumn) return;
@@ -57,10 +79,46 @@ export function KanbanBoard({ project, onBack }: KanbanBoardProps) {
   };
 
   const handleAddTask = (columnId: string) => {
-    const title = window.prompt('Enter task title:');
-    if (title) {
-      createTask(columnId, title);
+    setEditingColumnId(columnId);
+    setEditingTask(null);
+    setIsTaskDialogOpen(true);
+  };
+
+  const handleEditTask = (task: Task) => {
+    setEditingTask(task);
+    setIsTaskDialogOpen(true);
+  };
+
+  const handleSaveTask = (task: Partial<Task>) => {
+    if (task.id) {
+      updateTask(task.id, {
+        title: task.title,
+        description: task.description,
+      });
+    } else if (editingColumnId) {
+      createTask(editingColumnId, task.title || "", task.description);
     }
+    setIsTaskDialogOpen(false);
+    setEditingTask(null);
+    setEditingColumnId(null);
+  };
+
+  const handleDeleteTask = () => {
+    if (editingTask?.id) {
+      deleteTask(editingTask.id);
+    }
+    setIsTaskDialogOpen(false);
+    setEditingTask(null);
+  };
+
+  const handleSaveProjectSettings = (updates: Partial<Project>) => {
+    updateProject(project.id, updates);
+    setIsSettingsDialogOpen(false);
+  };
+
+  const handleDeleteProject = () => {
+    deleteProject(project.id);
+    onBack();
   };
 
   return (
@@ -77,18 +135,27 @@ export function KanbanBoard({ project, onBack }: KanbanBoardProps) {
             <ArrowLeft className="h-4 w-4" />
             Back to Projects
           </Button>
-          
+
           <div className="h-6 w-px bg-border" />
-          
+
           <div>
-            <h1 className="text-2xl font-bold text-foreground">{project.name}</h1>
+            <h1 className="text-2xl font-bold text-foreground">
+              {project.name}
+            </h1>
             {project.description && (
-              <p className="text-sm text-muted-foreground mt-1">{project.description}</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                {project.description}
+              </p>
             )}
           </div>
         </div>
 
-        <Button variant="outline" size="sm" className="gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-2"
+          onClick={() => setIsSettingsDialogOpen(true)}
+        >
           <Settings className="h-4 w-4" />
           Settings
         </Button>
@@ -103,7 +170,7 @@ export function KanbanBoard({ project, onBack }: KanbanBoardProps) {
         >
           <div className="flex gap-6 min-w-max pb-6">
             <SortableContext
-              items={columns.map(col => col.id)}
+              items={columns.map((col) => col.id)}
               strategy={horizontalListSortingStrategy}
             >
               {columns.map((column) => (
@@ -111,10 +178,7 @@ export function KanbanBoard({ project, onBack }: KanbanBoardProps) {
                   key={column.id}
                   column={column}
                   onAddTask={handleAddTask}
-                  onEditTask={(task) => {
-                    // For now, just console log - can be enhanced later
-                    console.log('Edit task:', task);
-                  }}
+                  onEditTask={handleEditTask}
                   onDeleteTask={deleteTask}
                 />
               ))}
@@ -122,12 +186,24 @@ export function KanbanBoard({ project, onBack }: KanbanBoardProps) {
           </div>
 
           <DragOverlay>
-            {activeTask ? (
-              <TaskCard task={activeTask} />
-            ) : null}
+            {activeTask ? <TaskCard task={activeTask} /> : null}
           </DragOverlay>
         </DndContext>
       </div>
+      <TaskDialog
+        isOpen={isTaskDialogOpen}
+        onClose={() => setIsTaskDialogOpen(false)}
+        onSave={handleSaveTask}
+        onDelete={handleDeleteTask}
+        task={editingTask}
+      />
+      <ProjectSettingsDialog
+        isOpen={isSettingsDialogOpen}
+        onClose={() => setIsSettingsDialogOpen(false)}
+        onSave={handleSaveProjectSettings}
+        onDelete={handleDeleteProject}
+        project={project}
+      />
     </div>
   );
 }

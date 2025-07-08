@@ -5,6 +5,7 @@ export interface Task {
   status: TaskStatus;
   priority: Priority;
   assignee?: string;
+  attachmentUrl?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -26,33 +27,33 @@ export interface Project {
   columns: Column[];
 }
 
-export type TaskStatus = 'todo' | 'in-progress' | 'review' | 'done';
+export type TaskStatus = "todo" | "in-progress" | "review" | "done";
 
-export type Priority = 'low' | 'medium' | 'high' | 'urgent';
+export type Priority = "low" | "medium" | "high" | "urgent";
 
-export const DEFAULT_COLUMNS: Omit<Column, 'tasks'>[] = [
+export const DEFAULT_COLUMNS: Omit<Column, "tasks">[] = [
   {
-    id: 'todo',
-    title: 'To Do',
-    status: 'todo',
-    color: 'status-todo'
+    id: "todo",
+    title: "To Do",
+    status: "todo",
+    color: "status-todo",
   },
   {
-    id: 'in-progress',
-    title: 'In Progress',
-    status: 'in-progress',
-    color: 'status-progress'
+    id: "in-progress",
+    title: "In Progress",
+    status: "in-progress",
+    color: "status-progress",
   },
   {
-    id: 'review',
-    title: 'Review',
-    status: 'review',
-    color: 'status-review'
+    id: "review",
+    title: "Review",
+    status: "review",
+    color: "status-review",
   },
   {
-    id: 'done',
-    title: 'Done',
-    status: 'done',
-    color: 'status-done'
-  }
+    id: "done",
+    title: "Done",
+    status: "done",
+    color: "status-done",
+  },
 ];
