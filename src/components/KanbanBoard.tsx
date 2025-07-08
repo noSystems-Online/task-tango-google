@@ -47,13 +47,13 @@ export function KanbanBoard({
     moveTask,
     reorderColumns,
   } = useKanban(project.columns);
+  const { editProject, deleteProject, fetchAll } = useProjectContext();
   const [activeTask, setActiveTask] = useState<Task | null>(null);
   const [activeColumnId, setActiveColumnId] = useState<string | null>(null);
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [editingColumnId, setEditingColumnId] = useState<string | null>(null);
   const [isSettingsDialogOpen, setIsSettingsDialogOpen] = useState(false);
-  const { editProject, deleteProject } = useProjectContext();
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -77,7 +77,31 @@ export function KanbanBoard({
     }
   };
 
-  const handleDragEnd = (event: DragEndEvent) => {
+  const handleSaveTask = async (task: Partial<Task>) => {
+    if (task.id) {
+      await updateTask(task.id, {
+        title: task.title,
+        description: task.description,
+      });
+    } else if (editingColumnId) {
+      await createTask(editingColumnId, task.title || "", task.description);
+    }
+    await fetchAll();
+    setIsTaskDialogOpen(false);
+    setEditingTask(null);
+    setEditingColumnId(null);
+  };
+
+  const handleDeleteTask = async () => {
+    if (editingTask?.id) {
+      await deleteTask(editingTask.id);
+      await fetchAll();
+    }
+    setIsTaskDialogOpen(false);
+    setEditingTask(null);
+  };
+
+  const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveTask(null);
     setActiveColumnId(null);
@@ -100,7 +124,8 @@ export function KanbanBoard({
           const newOrder = arrayMove(columns, oldIndex, newIndex).map(
             (col, idx) => ({ ...col, order: idx })
           );
-          reorderColumns(newOrder);
+          await reorderColumns(newOrder);
+          await fetchAll();
         }
       }
       return;
@@ -115,7 +140,8 @@ export function KanbanBoard({
     );
     if (!sourceColumn) return;
     if (sourceColumn.id !== overColumnId) {
-      moveTask(activeTaskId, sourceColumn.id, overColumnId);
+      await moveTask(activeTaskId, sourceColumn.id, overColumnId);
+      await fetchAll();
     }
   };
 
@@ -128,28 +154,6 @@ export function KanbanBoard({
   const handleEditTask = (task: Task) => {
     setEditingTask(task);
     setIsTaskDialogOpen(true);
-  };
-
-  const handleSaveTask = (task: Partial<Task>) => {
-    if (task.id) {
-      updateTask(task.id, {
-        title: task.title,
-        description: task.description,
-      });
-    } else if (editingColumnId) {
-      createTask(editingColumnId, task.title || "", task.description);
-    }
-    setIsTaskDialogOpen(false);
-    setEditingTask(null);
-    setEditingColumnId(null);
-  };
-
-  const handleDeleteTask = () => {
-    if (editingTask?.id) {
-      deleteTask(editingTask.id);
-    }
-    setIsTaskDialogOpen(false);
-    setEditingTask(null);
   };
 
   const handleSaveProjectSettings = (updates: Partial<Project>) => {
