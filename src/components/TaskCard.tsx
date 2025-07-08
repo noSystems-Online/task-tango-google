@@ -9,6 +9,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+
 import { MoreHorizontal, Clock, Flag, ChevronDown } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { useSortable } from "@dnd-kit/sortable";
@@ -20,6 +21,14 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import DOMPurify from "dompurify";
+
+// Utility to strip HTML tags and decode entities
+function stripHtml(html: string): string {
+  if (!html) return "";
+  const div = document.createElement("div");
+  div.innerHTML = html;
+  return div.textContent || div.innerText || "";
+}
 
 interface TaskCardProps {
   task: Task;
@@ -92,7 +101,7 @@ export function TaskCard({ task, onEdit }: TaskCardProps) {
             </CardTitle>
             {!isExpanded && task.description && (
               <p className="text-xs text-muted-foreground line-clamp-1 mt-1">
-                {task.description}
+                {stripHtml(task.description)}
               </p>
             )}
           </div>
@@ -110,15 +119,19 @@ export function TaskCard({ task, onEdit }: TaskCardProps) {
 
         <CollapsibleContent>
           <CardContent className="p-4 pt-0">
-            {task.attachmentUrl && (
-              <div className="mb-2">
-                <img
-                  src={task.attachmentUrl}
-                  alt="Task attachment"
-                  className="max-w-full h-auto rounded-md"
-                />
-              </div>
-            )}
+            {Array.isArray(task.attachmentUrls) &&
+              task.attachmentUrls.length > 0 && (
+                <div className="mb-2 flex flex-wrap gap-2">
+                  {task.attachmentUrls.map((url, idx) => (
+                    <img
+                      key={idx}
+                      src={url}
+                      alt={`Task attachment ${idx + 1}`}
+                      className="max-w-[6rem] h-16 object-cover rounded-md border"
+                    />
+                  ))}
+                </div>
+              )}
             {task.description && (
               <div
                 className="text-sm text-muted-foreground prose dark:prose-invert max-w-none"

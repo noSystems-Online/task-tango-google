@@ -17,17 +17,18 @@ import { Trash, Upload } from "lucide-react";
 import { useEffect, useState } from "react";
 import ReactQuill from "react-quill";
 import "react-quill/dist/quill.snow.css";
+import { supabase } from "@/integrations/supabase/client";
 
 const taskSchema = z.object({
   title: z.string().min(1, "Title is required"),
   description: z.string().optional(),
-  attachment: z.instanceof(File).optional(),
+  attachments: z.any().optional(), // We'll handle validation in the UI for multiple files
 });
 
 interface TaskDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (task: Partial<Task>) => void;
+  onSave: (task: Partial<Task>, files?: File[]) => void;
   onDelete?: () => void;
   task?: Task | null;
 }
@@ -39,9 +40,10 @@ export function TaskDialog({
   onDelete,
   task,
 }: TaskDialogProps) {
-  const [attachmentPreview, setAttachmentPreview] = useState<string | null>(
-    task?.attachmentUrl || null
+  const [attachmentPreviews, setAttachmentPreviews] = useState<string[]>(
+    task?.attachmentUrls || []
   );
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const {
     control,
     handleSubmit,
@@ -52,6 +54,7 @@ export function TaskDialog({
     defaultValues: {
       title: task?.title || "",
       description: task?.description || "",
+      attachments: [],
     },
   });
 
@@ -60,30 +63,39 @@ export function TaskDialog({
       reset({
         title: task.title,
         description: task.description || "",
+        attachments: [],
       });
-      setAttachmentPreview(task.attachmentUrl || null);
+      setAttachmentPreviews(task.attachmentUrls || []);
+      setSelectedFiles([]);
     } else {
       reset({
         title: "",
         description: "",
+        attachments: [],
       });
-      setAttachmentPreview(null);
+      setAttachmentPreviews([]);
+      setSelectedFiles([]);
     }
   }, [task, reset]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setAttachmentPreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
+    const files = Array.from(e.target.files || []);
+    setSelectedFiles(files);
+    // Generate previews
+    Promise.all(
+      files.map(
+        (file) =>
+          new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.readAsDataURL(file);
+          })
+      )
+    ).then((previews) => setAttachmentPreviews(previews));
   };
 
   const onSubmit = (data: z.infer<typeof taskSchema>) => {
-    onSave({ ...task, ...data });
+    onSave({ ...task, ...data }, selectedFiles);
     onClose();
   };
 
@@ -91,10 +103,67 @@ export function TaskDialog({
     reset({
       title: task?.title || "",
       description: task?.description || "",
+      attachments: [],
     });
-    setAttachmentPreview(task?.attachmentUrl || null);
+    setAttachmentPreviews(task?.attachmentUrls || []);
+    setSelectedFiles([]);
     onClose();
   };
+
+  // --- Image Paste Handler for ReactQuill ---
+  const handleImagePaste = async (e: Event) => {
+    const clipboardEvent = e as ClipboardEvent;
+    if (!clipboardEvent.clipboardData) return;
+    const items = clipboardEvent.clipboardData.items;
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item.type.indexOf("image") !== -1) {
+        const file = item.getAsFile();
+        if (file) {
+          // Upload to Supabase
+          const fileName = `${Date.now()}_${file.name}`;
+          const { error } = await supabase.storage
+            .from("task-attachments")
+            .upload(fileName, file);
+          if (error) {
+            console.error("Error uploading pasted image:", error);
+            return;
+          }
+          const {
+            data: { publicUrl },
+          } = supabase.storage.from("task-attachments").getPublicUrl(fileName);
+          if (publicUrl) {
+            // Insert image into editor
+            const quill = document.querySelector(".ql-editor");
+            if (quill) {
+              const selection = window.getSelection();
+              if (selection && selection.rangeCount > 0) {
+                const range = selection.getRangeAt(0);
+                const img = document.createElement("img");
+                img.src = publicUrl;
+                range.insertNode(img);
+                // Move cursor after image
+                range.setStartAfter(img);
+                range.collapse(true);
+                selection.removeAllRanges();
+                selection.addRange(range);
+              }
+            }
+          }
+        }
+      }
+    }
+  };
+
+  // Attach/detach paste event to ReactQuill editor
+  useEffect(() => {
+    const quillEditor = document.querySelector(".ql-editor");
+    if (!quillEditor) return;
+    quillEditor.addEventListener("paste", handleImagePaste);
+    return () => {
+      quillEditor.removeEventListener("paste", handleImagePaste);
+    };
+  }, [isOpen]);
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
@@ -134,22 +203,26 @@ export function TaskDialog({
             />
           </div>
           <div className="grid gap-2">
-            <Label htmlFor="attachment">Attachment</Label>
-            <div className="flex items-center gap-4">
-              <Input
-                id="attachment"
-                type="file"
-                onChange={handleFileChange}
-                className="flex-1"
-              />
-              {attachmentPreview && (
-                <img
-                  src={attachmentPreview}
-                  alt="Attachment preview"
-                  className="h-16 w-16 object-cover rounded-md"
-                />
-              )}
-            </div>
+            <Label htmlFor="attachment">Attachments</Label>
+            <Input
+              id="attachment"
+              type="file"
+              multiple
+              onChange={handleFileChange}
+              className="flex-1"
+            />
+            {attachmentPreviews.length > 0 && (
+              <div className="flex flex-wrap gap-2 mt-2">
+                {attachmentPreviews.map((preview, idx) => (
+                  <img
+                    key={idx}
+                    src={preview}
+                    alt={`Attachment preview ${idx + 1}`}
+                    className="h-16 w-16 object-cover rounded-md border"
+                  />
+                ))}
+              </div>
+            )}
           </div>
           <DialogFooter>
             {task && onDelete && (
