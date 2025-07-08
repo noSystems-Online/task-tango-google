@@ -57,7 +57,7 @@ export function KanbanBoard({ project, onBack }: KanbanBoardProps) {
   };
 
   const handleAddTask = (columnId: string) => {
-    const title = prompt('Enter task title:');
+    const title = window.prompt('Enter task title:');
     if (title) {
       createTask(columnId, title);
     }

@@ -6,9 +6,9 @@
 
 @layer base {
   :root {
-    /* Base colors - Clean professional palette */
-    --background: 248 250 252;
-    --foreground: 215 25% 27%;
+    /* Base colors - Relaxing nature-inspired palette */
+    --background: 200 25% 97%;
+    --foreground: 210 20% 20%;
 
     /* Card system */
     --card: 0 0% 100%;
@@ -18,21 +18,21 @@
     --popover: 0 0% 100%;
     --popover-foreground: 215 25% 27%;
 
-    /* Primary - Professional blue */
-    --primary: 217 91% 60%;
+    /* Primary - Calming teal */
+    --primary: 180 50% 45%;
     --primary-foreground: 0 0% 100%;
-    --primary-hover: 217 91% 55%;
+    --primary-hover: 180 50% 40%;
 
-    /* Secondary - Subtle gray */
-    --secondary: 215 20% 96%;
-    --secondary-foreground: 215 25% 27%;
+    /* Secondary - Soft sage */
+    --secondary: 120 20% 92%;
+    --secondary-foreground: 210 20% 20%;
 
     /* Muted tones */
-    --muted: 215 20% 96%;
-    --muted-foreground: 215 16% 47%;
+    --muted: 120 15% 94%;
+    --muted-foreground: 210 15% 45%;
 
-    /* Accent - Vibrant highlight */
-    --accent: 262 83% 58%;
+    /* Accent - Warm coral */
+    --accent: 15 75% 65%;
     --accent-foreground: 0 0% 100%;
 
     /* Destructive */
@@ -40,24 +40,24 @@
     --destructive-foreground: 0 0% 100%;
 
     /* Borders and inputs */
-    --border: 215 20% 91%;
-    --input: 215 20% 91%;
-    --ring: 217 91% 60%;
+    --border: 120 15% 88%;
+    --input: 120 15% 88%;
+    --ring: 180 50% 45%;
 
     /* Kanban specific colors */
-    --kanban-column-bg: 215 20% 98%;
+    --kanban-column-bg: 120 20% 97%;
     --kanban-task-bg: 0 0% 100%;
-    --kanban-task-shadow: 215 20% 91%;
+    --kanban-task-shadow: 120 15% 85%;
     
     /* Status colors */
-    --status-todo: 43 96% 56%;
-    --status-progress: 217 91% 60%;
-    --status-review: 262 83% 58%;
-    --status-done: 142 76% 36%;
+    --status-todo: 45 85% 60%;
+    --status-progress: 180 50% 55%;
+    --status-review: 15 75% 65%;
+    --status-done: 140 60% 50%;
     
     /* Gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(217 91% 60%), hsl(262 83% 58%));
-    --gradient-subtle: linear-gradient(180deg, hsl(248 250 252), hsl(241 245 249));
+    --gradient-primary: linear-gradient(135deg, hsl(180 50% 45%), hsl(140 60% 50%));
+    --gradient-subtle: linear-gradient(180deg, hsl(200 25% 97%), hsl(120 20% 95%));
     
     /* Shadows */
     --shadow-card: 0 1px 3px 0 hsl(215 20% 91% / 0.4);
