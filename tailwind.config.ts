@@ -26,7 +26,8 @@ export default {
 				foreground: 'hsl(var(--foreground))',
 				primary: {
 					DEFAULT: 'hsl(var(--primary))',
-					foreground: 'hsl(var(--primary-foreground))'
+					foreground: 'hsl(var(--primary-foreground))',
+					hover: 'hsl(var(--primary-hover))'
 				},
 				secondary: {
 					DEFAULT: 'hsl(var(--secondary))',
@@ -51,6 +52,17 @@ export default {
 				card: {
 					DEFAULT: 'hsl(var(--card))',
 					foreground: 'hsl(var(--card-foreground))'
+				},
+				kanban: {
+					column: 'hsl(var(--kanban-column-bg))',
+					task: 'hsl(var(--kanban-task-bg))',
+					shadow: 'hsl(var(--kanban-task-shadow))'
+				},
+				status: {
+					todo: 'hsl(var(--status-todo))',
+					progress: 'hsl(var(--status-progress))',
+					review: 'hsl(var(--status-review))',
+					done: 'hsl(var(--status-done))'
 				},
 				sidebar: {
 					DEFAULT: 'hsl(var(--sidebar-background))',
