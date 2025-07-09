@@ -60,9 +60,9 @@ export function useProjects() {
     const { data: tasksData, error: tasksError } = await supabase
       .from("tasks")
       .select(
-        "id, title, description, status, priority, assignee, created_at, updated_at, column_id, deleted"
+        "id, title, description, status, priority, assignee, created_at, updated_at, column_id, deleted, order"
       )
-      .order("created_at");
+      .order("order", { ascending: true });
     if (tasksError) {
       console.error("Error fetching tasks:", tasksError);
       setProjects([]);
@@ -94,6 +94,7 @@ export function useProjects() {
               comments: undefined,
               createdAt: t.created_at,
               updatedAt: t.updated_at,
+              order: t.order,
             }))
         : [],
     }));

@@ -28,7 +28,8 @@ export function KanbanColumn({
   onMoveColumn,
   isFirst,
   isLast,
-}: KanbanColumnProps) {
+  enableTaskSorting,
+}: KanbanColumnProps & { enableTaskSorting?: boolean }) {
   const { setNodeRef, isOver } = useDroppable({
     id: column.id,
   });
@@ -78,6 +79,7 @@ export function KanbanColumn({
                 task={task}
                 onEdit={onEditTask}
                 onDelete={onDeleteTask}
+                enableSorting={!!enableTaskSorting}
               />
             ))}
           </SortableContext>

@@ -83,6 +83,7 @@ export function useKanban(initialColumns: Column[]) {
       comments: undefined,
       createdAt: data.created_at,
       updatedAt: data.updated_at,
+      order: data.order ?? 0,
     };
 
     setColumns((prev) =>
@@ -140,7 +141,6 @@ export function useKanban(initialColumns: Column[]) {
       // Rollback UI state
       setColumns(prevColumns);
       // Optionally: show error to user (could use toast/snackbar)
-      // eslint-disable-next-line no-console
       console.error("Failed to delete task:", error.message || error);
       throw error;
     }
@@ -202,7 +202,6 @@ export function useKanban(initialColumns: Column[]) {
       // Rollback UI state
       setColumns(prevColumns);
       // Optionally: show error to user (could use toast/snackbar)
-      // eslint-disable-next-line no-console
       console.error("Failed to move task:", error.message || error);
       throw error;
     }
@@ -218,6 +217,39 @@ export function useKanban(initialColumns: Column[]) {
     setColumns(newOrder);
   };
 
+  // Reorder tasks within a column and persist to Supabase
+  const reorderTasks = async (columnId: string, orderedTaskIds: string[]) => {
+    // Optimistically update UI
+    const prevColumns = columns;
+    setColumns((prev) =>
+      prev.map((col) =>
+        col.id === columnId
+          ? {
+              ...col,
+              tasks: orderedTaskIds
+                .map((id) => col.tasks.find((t) => t.id === id))
+                .filter(Boolean) as Task[],
+            }
+          : col
+      )
+    );
+    // Persist order to Supabase
+    const updates = orderedTaskIds.map((id, idx) =>
+      supabase.from("tasks").update({ order: idx }).eq("id", id)
+    );
+    const results = await Promise.all(updates);
+    const hasError = results.some((res) => res.error);
+    if (hasError) {
+      // Rollback UI state if error
+      setColumns(prevColumns);
+      // Optionally: show error to user
+      console.error(
+        "Failed to reorder tasks:",
+        results.map((r) => r.error)
+      );
+    }
+  };
+
   return {
     columns,
     createTask,
@@ -225,5 +257,6 @@ export function useKanban(initialColumns: Column[]) {
     deleteTask,
     moveTask,
     reorderColumns,
+    reorderTasks,
   };
 }

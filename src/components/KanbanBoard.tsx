@@ -46,6 +46,7 @@ export function KanbanBoard({
     deleteTask,
     moveTask,
     reorderColumns,
+    reorderTasks,
   } = useKanban(project.columns);
   const { editProject, deleteProject, fetchAll } = useProjectContext();
   const [activeTask, setActiveTask] = useState<Task | null>(null);
@@ -131,7 +132,7 @@ export function KanbanBoard({
       return;
     }
 
-    // Handle task drag (move between columns)
+    // Handle task drag (move between columns or reorder within column)
     const activeTaskId = active.id as string;
     const overColumnId = over.id as string;
     // Find the source column
@@ -139,9 +140,56 @@ export function KanbanBoard({
       col.tasks.some((task) => task.id === activeTaskId)
     );
     if (!sourceColumn) return;
-    if (sourceColumn.id !== overColumnId) {
+
+    if (sourceColumn.id === overColumnId) {
+      // Reorder within the same column
+      const column = columns.find((col) => col.id === overColumnId);
+      if (!column) return;
+      const oldIndex = column.tasks.findIndex(
+        (task) => task.id === activeTaskId
+      );
+      let overTaskIndex = column.tasks.findIndex((task) => task.id === over.id);
+      // If dropped on the column itself (empty space), move to end
+      if (overTaskIndex === -1) overTaskIndex = column.tasks.length;
+      if (oldIndex !== -1 && oldIndex !== overTaskIndex) {
+        const newTaskOrder = arrayMove(
+          column.tasks,
+          oldIndex,
+          overTaskIndex
+        ).map((t) => t.id);
+        // Optimistically update UI
+        await reorderTasks(column.id, newTaskOrder);
+      }
+    } else {
+      // Move to another column and reorder both columns
+      // Optimistically update UI
       await moveTask(activeTaskId, sourceColumn.id, overColumnId);
-      await fetchAll();
+      // After move, build new order for both columns
+      const source = columns.find((col) => col.id === sourceColumn.id);
+      const dest = columns.find((col) => col.id === overColumnId);
+      if (source) {
+        const sourceTaskIds = source.tasks
+          .filter((t) => t.id !== activeTaskId)
+          .map((t) => t.id);
+        await reorderTasks(source.id, sourceTaskIds);
+      }
+      if (dest) {
+        // If dropped on a task, insert before that task; else, add to end
+        let destTaskIds = dest.tasks.map((t) => t.id);
+        const overTaskIndex = dest.tasks.findIndex(
+          (task) => task.id === over.id
+        );
+        if (overTaskIndex === -1) {
+          destTaskIds = [...destTaskIds, activeTaskId];
+        } else {
+          destTaskIds = [
+            ...destTaskIds.slice(0, overTaskIndex),
+            activeTaskId,
+            ...destTaskIds.slice(overTaskIndex),
+          ];
+        }
+        await reorderTasks(dest.id, destTaskIds);
+      }
     }
   };
 
@@ -245,6 +293,7 @@ export function KanbanBoard({
                   onMoveColumn={handleMoveColumn}
                   isFirst={idx === 0}
                   isLast={idx === columns.length - 1}
+                  enableTaskSorting
                 />
               ))}
             </SortableContext>

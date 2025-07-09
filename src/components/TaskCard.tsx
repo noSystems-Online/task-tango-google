@@ -34,6 +34,7 @@ interface TaskCardProps {
   task: Task;
   onEdit?: (task: Task) => void;
   onDelete?: (taskId: string) => void;
+  enableSorting?: boolean;
 }
 
 const priorityColors: Record<Priority, string> = {
@@ -50,7 +51,7 @@ const priorityIcons: Record<Priority, React.ReactNode> = {
   urgent: <Flag className="h-3 w-3 fill-current" />,
 };
 
-export function TaskCard({ task, onEdit }: TaskCardProps) {
+export function TaskCard({ task, onEdit, enableSorting }: TaskCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const {
     attributes,
@@ -60,12 +61,13 @@ export function TaskCard({ task, onEdit }: TaskCardProps) {
     transition,
     isDragging,
   } = useSortable({ id: task.id });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-  };
+  const style = enableSorting
+    ? {
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.5 : 1,
+      }
+    : undefined;
 
   const clickTimeout = useRef<number | null>(null);
 
@@ -91,8 +93,8 @@ export function TaskCard({ task, onEdit }: TaskCardProps) {
       >
         <div className="flex items-start p-4">
           <div
-            {...attributes}
-            {...listeners}
+            {...(enableSorting ? attributes : {})}
+            {...(enableSorting ? listeners : {})}
             onClick={handleTitleClick}
             className="flex-1 cursor-pointer"
           >

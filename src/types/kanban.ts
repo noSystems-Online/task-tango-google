@@ -10,6 +10,7 @@ export interface Task {
   comments?: Comment[];
   createdAt: string; // ISO string
   updatedAt: string; // ISO string
+  order: number; // Order within the column for drag-and-drop
 }
 
 export interface Column {
