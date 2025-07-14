@@ -47,7 +47,10 @@ export function ProjectCard({
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between">
           <div className="space-y-1">
-            <CardTitle className="text-lg font-semibold text-foreground group-hover:text-primary transition-[var(--transition-smooth)]">
+            <CardTitle 
+              className="text-lg font-semibold text-foreground group-hover:text-primary transition-[var(--transition-smooth)] cursor-pointer"
+              onClick={() => onOpenProject(project)}
+            >
               {project.name}
             </CardTitle>
             <CardDescription className="text-sm text-muted-foreground line-clamp-2">

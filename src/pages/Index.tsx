@@ -23,6 +23,8 @@ const Index = () => {
 
   const handleColumnsChange = (columns: Project["columns"]) => {
     setSelectedProject((prev) => (prev ? { ...prev, columns } : prev));
+    // Trigger a re-render of the dashboard to update progress bars
+    setProjectListVersion((v) => v + 1);
   };
 
   if (currentView === "board" && selectedProject) {

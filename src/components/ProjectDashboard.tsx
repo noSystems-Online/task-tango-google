@@ -15,8 +15,9 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Plus, Search, Filter } from "lucide-react";
+import { Plus, Search, Filter, Grid, List } from "lucide-react";
 import { EditProjectDialog } from "@/components/EditProjectDialog";
+import { ProjectTable } from "./ProjectTable";
 
 interface ProjectDashboardProps {
   onOpenProject: (project: Project) => void;
@@ -31,6 +32,7 @@ export function ProjectDashboard({ onOpenProject }: ProjectDashboardProps) {
   const [newProjectDescription, setNewProjectDescription] = useState("");
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
 
   const filteredProjects = projects.filter(
     (project) =>
@@ -143,10 +145,30 @@ export function ProjectDashboard({ onOpenProject }: ProjectDashboardProps) {
                 className="pl-10 border-border/50"
               />
             </div>
-            <Button variant="outline" className="gap-2">
-              <Filter className="h-4 w-4" />
-              Filter
-            </Button>
+            <div className="flex gap-2">
+              <div className="flex border border-border/50 rounded-md">
+                <Button
+                  variant={viewMode === "cards" ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => setViewMode("cards")}
+                  className="rounded-r-none"
+                >
+                  <Grid className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant={viewMode === "table" ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => setViewMode("table")}
+                  className="rounded-l-none"
+                >
+                  <List className="h-4 w-4" />
+                </Button>
+              </div>
+              <Button variant="outline" className="gap-2">
+                <Filter className="h-4 w-4" />
+                Filter
+              </Button>
+            </div>
           </div>
         </div>
       </div>
@@ -190,7 +212,7 @@ export function ProjectDashboard({ onOpenProject }: ProjectDashboardProps) {
               </div>
             )}
           </div>
-        ) : (
+        ) : viewMode === "cards" ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredProjects.map((project) => (
               <ProjectCard
@@ -202,6 +224,13 @@ export function ProjectDashboard({ onOpenProject }: ProjectDashboardProps) {
               />
             ))}
           </div>
+        ) : (
+          <ProjectTable
+            projects={filteredProjects}
+            onOpenProject={onOpenProject}
+            onDeleteProject={deleteProject}
+            onEditProject={handleEditProject}
+          />
         )}
       </div>
       <EditProjectDialog
