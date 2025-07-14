@@ -88,6 +88,10 @@ export function KanbanBoard({
       await createTask(editingColumnId, task.title || "", task.description);
     }
     await fetchAll();
+    // Update parent component with new columns state
+    if (onColumnsChange) {
+      onColumnsChange(columns);
+    }
     setIsTaskDialogOpen(false);
     setEditingTask(null);
     setEditingColumnId(null);
@@ -97,6 +101,10 @@ export function KanbanBoard({
     if (editingTask?.id) {
       await deleteTask(editingTask.id);
       await fetchAll();
+      // Update parent component with new columns state
+      if (onColumnsChange) {
+        onColumnsChange(columns);
+      }
     }
     setIsTaskDialogOpen(false);
     setEditingTask(null);
@@ -127,6 +135,10 @@ export function KanbanBoard({
           );
           await reorderColumns(newOrder);
           await fetchAll();
+          // Update parent component with new columns state
+          if (onColumnsChange) {
+            onColumnsChange(columns);
+          }
         }
       }
       return;
@@ -159,6 +171,10 @@ export function KanbanBoard({
         ).map((t) => t.id);
         // Optimistically update UI
         await reorderTasks(column.id, newTaskOrder);
+        // Update parent component with new columns state
+        if (onColumnsChange) {
+          onColumnsChange(columns);
+        }
       }
     } else {
       // Move to another column and reorder both columns
@@ -189,6 +205,10 @@ export function KanbanBoard({
           ];
         }
         await reorderTasks(dest.id, destTaskIds);
+      }
+      // Update parent component with new columns state
+      if (onColumnsChange) {
+        onColumnsChange(columns);
       }
     }
   };
